@@ -145,13 +145,22 @@ pheatmap(rld_cor, cluster_rows=F, cluster_cols=F)
 
 
 
-### Gene expression analysis
+### Run analysis
 
 dds <- DESeq(dds)
+
+plotDispEsts(dds)
 
 contrasts <- c("duration", "CTRL", chosen_duration)
 res_table_unshrunken <- results(dds, contrast=contrasts , alpha = 0.05)
 res_table <- lfcShrink(dds, contrast=contrasts, res=res_table_unshrunken, type="ashr")
+
+plotMA(res_table_unshrunken, ylim=c(-2,2))
+plotMA(res_table, ylim=c(-2,2))
+
+
+
+### Gene expression analysis
 
 normalized_counts <- counts(dds, normalized=TRUE)
 data.frame() %>%
