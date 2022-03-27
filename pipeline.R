@@ -11,6 +11,7 @@ library(ggrepel)
 library(EnhancedVolcano)
 # BiocManager::install('DOSE')
 library(DOSE)
+library(pheatmap)
 
 # BiocManager::install("clusterProfiler")
 library(clusterProfiler)
@@ -19,9 +20,9 @@ library(enrichplot)
 
 ### CHOIX DE LA METHODE ET DES CONDITIONS DE TEST
 
- chosen_method = "RNASeq"
+ chosen_method = "RNASeq" # RNASeq or # MassSpec
  print(paste0("On étudie des données de ",chosen_method))
- chosen_cancer <- "B16" #4T1,B16,MC38 ou MOPC315
+ chosen_cancer <- "MC38" #4T1,B16,MC38 ou MOPC315
  chosen_duration <- "72H" #4H,24H ou 72H
  print(paste0("Etude menée pour le cancer ",chosen_cancer, "et pour une durée d'exposition de ", chosen_duration))
 
@@ -90,17 +91,61 @@ if (chosen_method == "RNASeq")  {
   }
 }
 
+
+### Quality analysis
+
+
+# ggplot(data) +
+#   geom_histogram(aes(x = X.1..SWATH.4T1.4H.20.1.wiff.PG.Quantity), stat = "bin", bins = 200) +
+#   xlim(-1, 300)  +
+#   xlab("Raw expression counts") +
+#   ylab("Number of genes") +
+#   ggtitle(sprintf("%s %s %s", chosen_method, chosen_cancer, chosen_duration))
+
+
+mean_counts <- apply(data_cancer, 1, mean)
+variance_counts <- apply(data_cancer, 1, var)
+df_counts <- data.frame(mean_counts, variance_counts)
+
+ggplot(df_counts) +
+  geom_point(aes(x=mean_counts, y=variance_counts)) + 
+  geom_line(aes(x=mean_counts, y=mean_counts, color="red")) +
+  scale_y_log10() +
+  scale_x_log10() +
+  ggtitle(sprintf("%s %s %s", chosen_method, chosen_cancer, chosen_duration))
+
+
+
 dds <- DESeqDataSetFromMatrix(countData = data_cancer, colData = meta_cancer, design = ~ duration )
 if (chosen_method == "MassSpec") {
   rownames(dds) <- data[,2] 
+  intergroup <- "test"
 }
 if (chosen_method == "RNASeq") {
   rownames(dds) <- data[,1] 
+  intergroup <- "ID"
 }
 dds$duration <- relevel(dds$duration,"CTRL") # necessary to compare all samples against control
 
 
-### Run analysis
+### Transform counts for data visualization 
+#  (To improve the distances/clustering for the PCA and heirarchical clustering 
+#  visualization methods, we need to moderate the variance across 
+#  the mean by applying the rlog transformation to the normalized counts.)
+
+rld <- vst(dds, blind=TRUE) 
+plotPCA(rld, intgroup=intergroup)
+
+
+## heatmap
+
+rld_mat <- assay(rld) # Extract the rlog matrix from the object
+rld_cor <- cor(rld_mat) # Compute pairwise correlation values
+pheatmap(rld_cor, cluster_rows=F, cluster_cols=F)
+
+
+
+### Gene expression analysis
 
 dds <- DESeq(dds)
 
